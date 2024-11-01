@@ -13,6 +13,7 @@ from pulp_client import PulpCoreClient
 import tasks
 import collection_utils
 from indexer import es
+import elasticsearch
 
 
 app = Flask(__name__)
@@ -44,7 +45,10 @@ def initialize():
     distro = pc.create_distribution(repo, settings.DEFAULT_DISTRIBUTION_NAME)
 
     # make the default index
-    es.indices.create(index="content_index")
+    try:
+        es.indices.create(index="content_index")
+    except elasticsearch.BadRequestError:
+        pass
 
 
 @app.route('/')
