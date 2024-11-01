@@ -1,0 +1,90 @@
+services:
+
+  # https://172.29.0.2/pulp/api/v3/repositories/ansible/ansible/
+  pulpcore:
+    image: pulp/pulp
+    ports:
+      - '8444:443'
+    environment:
+      - PULP_HTTPS=true
+      - PULP_DEFAULT_ADMIN_PASSWORD=admin
+
+  redis:
+    image: "redis:5"
+
+  elasticsearch:
+    image: "elasticsearch:8.15.3"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false  # Disable authentication
+
+  #hubdb:
+  #  image: postgres:13
+  #  container_name: db
+  #  volumes:
+  #    - pg_data:/var/lib/postgresql/data
+  #  environment:
+  #    - POSTGRES_USER=hub
+  #    - POSTGRES_PASSWORD=hub
+  #    - POSTGRES_DB=hub
+
+  hub:
+    build:
+      context: src/hub
+    depends_on:
+      - redis
+      - elasticsearch
+    volumes:
+      - './src/hub:/app'
+    ports:
+      - '8080:80'
+    environment:
+      # - DATABASE_URL=postgresql://hub:hub@hubdb/hub
+      - PULP_CORE_URL=https://pulpcore
+      - PULP_CORE_USERNAME=admin
+      - PULP_CORE_PASSWORD=admin
+      - API_HOSTNAME=http://localhost:8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=9200
+
+  indexer:
+    build:
+      context: src/hub
+    command: /venv/bin/python indexer.py
+    depends_on:
+      - redis
+      - elasticsearch
+    volumes:
+      - './src/hub:/app'
+    environment:
+      # - DATABASE_URL=postgresql://hub:hub@hubdb/hub
+      - PULP_CORE_URL=https://pulpcore
+      - PULP_CORE_USERNAME=admin
+      - PULP_CORE_PASSWORD=admin
+      - API_HOSTNAME=http://localhost:8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=9200
+
+  rq-worker:
+    build:
+      context: src/hub
+    command: /venv/bin/rq worker --url redis://redis:6379
+    depends_on:
+      - redis
+      - elasticsearch
+    volumes:
+      - './src/hub:/app'
+    environment:
+      # - DATABASE_URL=postgresql://hub:hub@hubdb/hub
+      - PULP_CORE_URL=https://pulpcore
+      - PULP_CORE_USERNAME=admin
+      - PULP_CORE_PASSWORD=admin
+      - API_HOSTNAME=http://localhost:8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=9200
